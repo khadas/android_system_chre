@@ -152,7 +152,7 @@ bool EventLoop::startNanoapp(UniquePtr<Nanoapp>& nanoapp) {
     LOGE("App with ID 0x%016" PRIx64 " already exists as instance ID 0x%"
          PRIx32, nanoapp->getAppId(), existingInstanceId);
   } else if (!mNanoapps.prepareForPush()) {
-    LOG_OOM();
+    LOGE("Failed to allocate space for new nanoapp");
   } else {
     nanoapp->setInstanceId(eventLoopManager->getNextInstanceId());
     LOGD("Instance ID %" PRIu32 " assigned to app ID 0x%016" PRIx64,
@@ -433,7 +433,7 @@ void EventLoop::notifyAppStatusChange(uint16_t eventType,
                                       const Nanoapp& nanoapp) {
   auto *info = memoryAlloc<chreNanoappInfo>();
   if (info == nullptr) {
-    LOG_OOM();
+    LOGE("Couldn't alloc app status change event");
   } else {
     info->appId      = nanoapp.getAppId();
     info->version    = nanoapp.getAppVersion();

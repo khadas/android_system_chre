@@ -146,11 +146,6 @@ class ArrayQueue : public NonCopyable {
   bool emplace(Args&&... args);
 
   /**
-   * Removes all the elements of the queue.
-   */
-  void clear();
-
-  /**
    * A template class that implements a forward iterator for the array queue.
    */
   template<typename ValueType>

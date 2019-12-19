@@ -20,13 +20,10 @@
 #include <cstddef>
 
 #include <shared/send_message.h>
-#include <shared/time_util.h>
 
 #include <chre.h>
 
 using nanoapp_testing::MessageType;
-using nanoapp_testing::kOneMillisecondInNanoseconds;
-using nanoapp_testing::kOneSecondInNanoseconds;
 using nanoapp_testing::sendFatalFailureToHost;
 using nanoapp_testing::sendInternalFailureToHost;
 using nanoapp_testing::sendStringToHost;
@@ -55,7 +52,9 @@ namespace general_test {
 
 namespace {
 constexpr uint16_t kStartEvent = CHRE_EVENT_FIRST_USER_VALUE;
-constexpr uint64_t kEventLoopSlack = 100 * kOneMillisecondInNanoseconds;
+constexpr uint16_t kPassiveCompleteEvent = CHRE_EVENT_FIRST_USER_VALUE + 1;
+constexpr uint64_t kNanosecondsPerSecond = 1000000000;
+constexpr uint64_t kEventLoopSlack = 100000000;  // 100 msec
 
 uint64_t getEventDuration(const chreSensorThreeAxisData *event) {
   uint64_t duration = 0;
@@ -71,6 +70,7 @@ BasicSensorTestBase::BasicSensorTestBase()
   : Test(CHRE_API_VERSION_1_0),
     mInMethod(true),
     mExternalSamplingStatusChange(false),
+    mDoneWithPassiveConfigure(false),
     mState(State::kPreStart),
     mInstanceId(chreGetInstanceId())
     /* All other members initialized later */ {
@@ -121,19 +121,19 @@ void BasicSensorTestBase::checkPassiveConfigure() {
   } else {
     if (!chreSensorConfigure(mSensorHandle, mode,
                              CHRE_SENSOR_INTERVAL_DEFAULT,
-                             kOneSecondInNanoseconds)) {
+                             kNanosecondsPerSecond)) {
       sendFatalFailureToHost("chreSensorConfigure() failed passive with "
                              "default interval and non-default latency");
     }
     if (!isOneShotSensor() && !chreSensorConfigure(
-        mSensorHandle, mode, kOneSecondInNanoseconds,
+        mSensorHandle, mode, kNanosecondsPerSecond,
         CHRE_SENSOR_LATENCY_DEFAULT)) {
       sendFatalFailureToHost("chreSensorConfigure() failed passive with "
                              "non-default interval and default latency");
     }
     if (!isOneShotSensor() && !chreSensorConfigure(
-        mSensorHandle, mode, kOneSecondInNanoseconds,
-        kOneSecondInNanoseconds)) {
+        mSensorHandle, mode, kNanosecondsPerSecond,
+        kNanosecondsPerSecond)) {
       sendFatalFailureToHost("chreSensorConfigure() failed passive with "
                              "non-default interval and latency");
     }
@@ -176,8 +176,14 @@ void BasicSensorTestBase::startTest() {
     sendFatalFailureToHost("chreGetSensorSamplingStatus() failed");
   }
 
-  // Set the base timestamp to compare against before configuring the sensor.
+  // Nanoapp may start getting events with a passive request. Set the base
+  // timestamp to compare against before configuring the sensor.
   mPreTimestamp = chreGetTime();
+
+  checkPassiveConfigure();
+  if (!chreSendEvent(kPassiveCompleteEvent, nullptr, nullptr, mInstanceId)) {
+    sendFatalFailureToHost("Failed chreSendEvent to complete passive test");
+  }
 
   // Default interval/latency must be accepted by all sensors.
   mNewStatus = {
@@ -205,7 +211,7 @@ void BasicSensorTestBase::startTest() {
     //     from what it currently is for the sensor, and confirm it
     //     changes back when we're DONE.  But that's beyond the current
     //     scope of this 'basic' test.
-    kOneSecondInNanoseconds, /* interval */
+    kNanosecondsPerSecond, /* interval */
     // We want the test to run as quickly as possible.
     // TODO: Similar to the interval, we could try to test changes in
     //     this value, but it's beyond our 'basic' scope for now.
@@ -235,8 +241,6 @@ void BasicSensorTestBase::startTest() {
 }
 
 void BasicSensorTestBase::finishTest() {
-  checkPassiveConfigure();
-
   if (!chreSensorConfigureModeOnly(mSensorHandle,
                                    CHRE_SENSOR_CONFIGURE_MODE_DONE)) {
     sendFatalFailureToHost("Unable to configure sensor mode to DONE");
@@ -251,14 +255,11 @@ void BasicSensorTestBase::finishTest() {
     if (status.enabled != mOriginalStatus.enabled) {
       sendFatalFailureToHost("SensorInfo.enabled not back to original");
     }
-    // Interval and latency values are only relevent if the sensor is enabled.
-    if (status.enabled) {
-      if (status.interval != mOriginalStatus.interval) {
-        sendFatalFailureToHost("SensorInfo.interval not back to original");
-      }
-      if (status.latency != mOriginalStatus.latency) {
-        sendFatalFailureToHost("SensorInfo.latency not back to original");
-      }
+    if (status.interval != mOriginalStatus.interval) {
+      sendFatalFailureToHost("SensorInfo.interval not back to original");
+    }
+    if (status.latency != mOriginalStatus.latency) {
+      sendFatalFailureToHost("SensorInfo.latency not back to original");
     }
   }
   mState = State::kFinished;
@@ -361,7 +362,7 @@ void BasicSensorTestBase::handleSamplingChangeEvent(
   }
   // Passive sensor requests do not guarantee sensors will always be enabled.
   // Bypass 'enabled' check for passive configurations.
-  if (!eventData->status.enabled) {
+  if (mDoneWithPassiveConfigure && !eventData->status.enabled) {
     sendFatalFailureToHost("SamplingChangeEvent disabled the sensor.");
   }
 
@@ -411,7 +412,10 @@ void BasicSensorTestBase::handleEvent(
   if (senderInstanceId == mInstanceId) {
     if ((eventType == kStartEvent) && (mState == State::kPreStart)) {
       startTest();
+    } else if (eventType == kPassiveCompleteEvent) {
+      mDoneWithPassiveConfigure = true;
     }
+
   } else if ((mState == State::kPreStart) ||
              (mState == State::kPreConfigure)) {
     unexpectedEvent(eventType);

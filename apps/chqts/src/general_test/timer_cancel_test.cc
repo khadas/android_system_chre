@@ -20,11 +20,9 @@
 #include <cstddef>
 
 #include <shared/send_message.h>
-#include <shared/time_util.h>
 
 #include <chre.h>
 
-using nanoapp_testing::kOneMillisecondInNanoseconds;
 using nanoapp_testing::sendFatalFailureToHost;
 using nanoapp_testing::sendInternalFailureToHost;
 using nanoapp_testing::sendSuccessToHost;
@@ -38,7 +36,8 @@ using nanoapp_testing::sendSuccessToHost;
  * When all of our stages have succeeded, then we send success to the host.
  */
 
-static uint64_t kDuration = 10 * kOneMillisecondInNanoseconds;
+// 10 milliseconds
+static uint64_t kDuration = UINT64_C(10000000);
 
 namespace general_test {
 

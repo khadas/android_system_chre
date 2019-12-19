@@ -41,27 +41,22 @@ UniquePtr<char> EventLoopManager::debugDump() {
     size_t debugStrPos = 0;
     if (!mMemoryManager.logStateToBuffer(debugStr, &debugStrPos,
                                          kDebugStringSize)) {
-      LOG_OOM();
+      LOGE("Memory manager debug dump failed.");
     } else if (!mEventLoop.logStateToBuffer(debugStr, &debugStrPos,
                                             kDebugStringSize)) {
-      LOG_OOM();
+      LOGE("Event loop debug dump failed.");
     } else if (!mSensorRequestManager.logStateToBuffer(debugStr, &debugStrPos,
                                                        kDebugStringSize)) {
-      LOG_OOM();
+      LOGE("Sensor request manager debug dump failed.");
     } else if (!mGnssManager.logStateToBuffer(debugStr, &debugStrPos,
                                               kDebugStringSize)) {
-      LOG_OOM();
+      LOGE("GNSS manager debug dump failed.");
     } else if (!mWifiRequestManager.logStateToBuffer(debugStr, &debugStrPos,
                                                      kDebugStringSize)) {
-      LOG_OOM();
+      LOGE("Wifi request manager debug dump failed.");
     } else if (!mWwanRequestManager.logStateToBuffer(debugStr, &debugStrPos,
                                                      kDebugStringSize)) {
-      LOG_OOM();
-#ifdef CHRE_AUDIO_SUPPORT_ENABLED
-    } else if (!mAudioRequestManager.logStateToBuffer(debugStr, &debugStrPos,
-                                                      kDebugStringSize)) {
-      LOG_OOM();
-#endif  // CHRE_AUDIO_SUPPORT_ENABLED
+      LOGE("WWAN request manager debug dump failed.");
     }
     LOGD("Debug dump used %zu bytes of log buffer", debugStrPos);
   }

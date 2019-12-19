@@ -46,7 +46,7 @@ bool HostCommsManager::sendMessageToHostFromNanoapp(
     MessageToHost *msgToHost = mMessagePool.allocate();
 
     if (msgToHost == nullptr) {
-      LOG_OOM();
+      LOGE("Couldn't allocate message to host");
     } else {
       msgToHost->appId = nanoapp->getAppId();
       msgToHost->message.wrap(static_cast<uint8_t *>(messageData), messageSize);
@@ -75,7 +75,7 @@ void HostCommsManager::deliverNanoappMessageFromHost(
 
   MessageFromHost *msgFromHost = mMessagePool.allocate();
   if (msgFromHost == nullptr) {
-    LOG_OOM();
+    LOGE("Couldn't allocate message from host");
   } else if (!msgFromHost->message.copy_array(
       static_cast<const uint8_t *>(messageData), messageSize)) {
     LOGE("Couldn't allocate %" PRIu32 " bytes for message data from host "
